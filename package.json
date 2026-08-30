@@ -1,0 +1,36 @@
+{
+  "name": "macsn",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Macro Scanner backend — BAML + MiniMax M3 vision + SQLite",
+  "scripts": {
+    "dev": "next dev -p 3008",
+    "build": "next build",
+    "start": "next start -p 3008",
+    "test": "vitest run",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "baml:generate": "baml-cli generate",
+    "tsc": "tsc --noEmit",
+    "smoke": "bash tests/smoke.sh"
+  },
+  "dependencies": {
+    "@boundaryml/baml": "^0.200.0",
+    "better-sqlite3": "^11.5.0",
+    "next": "15.0.3",
+    "react": "19.0.0-rc-66855b96-20241106",
+    "react-dom": "19.0.0-rc-66855b96-20241106",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^22.9.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.4"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
