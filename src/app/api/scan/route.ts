@@ -1,7 +1,8 @@
-// app/api/scan/route.ts — POST foto -> BAML/wrapper -> MealAnalysis
+// app/api/scan/route.ts — POST foto -> BAML/wrapper -> MealAnalysis -> calibrateMeal
 import { NextRequest, NextResponse } from "next/server";
 import { ScanInputSchema } from "@/lib/schemas";
 import { analyzeMeal } from "@/lib/baml";
+import { calibrateMeal } from "@/lib/postprocess";
 import { ApiError, errorResponse } from "@/lib/errors";
 
 export const runtime = "nodejs";
@@ -26,7 +27,17 @@ export async function POST(req: NextRequest) {
       meal: parsed.data.meal,
       mealContext: parsed.data.meal_context,
     });
-    return NextResponse.json(analysis);
+    // Post-procesado: detecta outliers de densidad y degrada la confianza si procede.
+    const { result, calib } = calibrateMeal(analysis);
+    return NextResponse.json({
+      ...result,
+      _calibration: {
+        flags: calib.flags,
+        calibrated: calib.calibrated,
+        original_confidence: calib.original_confidence,
+        final_confidence: calib.final_confidence,
+      },
+    });
   } catch (err) {
     const { status, body } = errorResponse(err);
     return NextResponse.json(body, { status });

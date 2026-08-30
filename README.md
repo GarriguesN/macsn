@@ -51,10 +51,53 @@ Response 200:
   "hidratos_total_g": 4,
   "items": [
     { "name": "Tortilla de jamón", "grams": 80, "kcal": 220, "p": 18, "f": 14, "h": 4 }
-  ]
+  ],
+  "_calibration": {
+    "flags": [],
+    "calibrated": false,
+    "original_confidence": "alta",
+    "final_confidence": "alta"
+  }
 }
 ```
 Errors: `400 invalid_input`, `422 minimax_*`, `503 minimax_quota`, `500 internal_error`.
+
+#### Calibración de scans (`_calibration`)
+
+Tras el round de testing con 6 fotos reales detectamos dos patrones de imprecisión
+recurrentes: (1) hidratos del arroz y huevos fritos tienden a sobreestimarse, y
+(2) la confianza siempre volvía "media" incluso en fotos obvias. La capa de
+calibración post-procesa el JSON de MiniMax M3 antes de devolverlo al cliente:
+
+- **Tabla de densidades** (`src/lib/calibration.ts`): rangos kcal/g por categoría
+  de alimento basados en BEDCA + USDA + ajustes del usuario tras testing. Cubre
+  ~40 categorías (cocina española + latinoamericana: arepa, empanada_frita,
+  chicharrones, tostones, chorizo, etc.).
+- **Detector de outliers** (`src/lib/postprocess.ts`): cada item cuya `kcal/g`
+  caiga fuera del rango plausible (con tolerancia ±30% inf / +40% sup) genera
+  un flag `density_outlier: <nombre> = <X.XX> kcal/g (esperado <min>-<max>)`.
+- **Detector de inconsistencia**: si la suma de `items[].kcal` diverge de
+  `kcal_total` en más de un 10% genera flag `sum_mismatch`.
+- **Auto-degradación de confianza**:
+  - ≥2 density_outlier -> baja a `"baja"`
+  - 1 outlier + confianza original `"alta"` -> baja a `"media"`
+  - 1 outlier + `"media"` -> se mantiene (sin cascada)
+  - sum_mismatch adicional con confianza `"media"` -> baja a `"baja"`
+
+El cliente recibe el bloque `_calibration` con `flags`, `calibrated`,
+`original_confidence`, `final_confidence` para mostrarlo al usuario (p.ej.
+"Detectamos 1 estimación dudosa, revisa los huevos fritos").
+
+**Matcher**: `classifyFood(name)` normaliza a lowercase + sin acentos y parte
+por cualquier no-alfanumérico (`/`, `-`, espacios). Reconoce singular y plural
+(`huevo` ↔ `huevos`, `chicharron` ↔ `chicharrones`). Token match, no substring
+libre (así "Empanada" no matchea accidentalmente con la key `pan_blanco`).
+
+Ejemplo de flag real (foto de empanadas+huevos+chicharrones):
+```
+density_outlier: Tortas/tortillas fritas de maiz = 3.00 kcal/g (esperado 1.3-1.8)
+density_outlier: Tortita de arroz = 3.75 kcal/g (esperado 1-1.5)
+```
 
 ### `GET /api/meals`
 Filtros (todos opcionales, combinables): `date=YYYY-MM-DD`, `from=YYYY-MM-DD`, `to=YYYY-MM-DD`, `meal=breakfast|lunch|dinner|snack`.

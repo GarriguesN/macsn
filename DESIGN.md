@@ -110,14 +110,63 @@ daily_settings
         body: { model: "MiniMax-M3", messages: [...], response_format: json_object }
       → extractJson(content)  // strips fences, locates first {…}
       → MealAnalysisSchema.safeParse(parsed)
-  → return MealAnalysis JSON
+  → calibrateMeal(meal)
+      → density outlier detection (FOOD_DENSITY table, ±30%/-40% tolerance)
+      → sum_mismatch detection (items vs kcal_total, >10%)
+      → confidence auto-degradation
+  → return { ...meal, _calibration: { flags, calibrated, original_confidence, final_confidence } }
 ```
+
+### 4.1 Capa de calibración
+
+**Motivación** (round de testing 2026-08-30, 6 fotos reales): MiniMax M3 tiende
+a (a) sobreestimar kcal de hidratos (arroz, huevos fritos, empanadas), y (b)
+declarar siempre `"confidence": "media"` incluso en fotos obvias. El usuario
+quería poder fiarse de los números sin tener que ajustar con sliders.
+
+**Solución**: una capa de post-procesado en el backend que no modifica kcal ni
+gramos — solo marca flags y degrada la confianza. El frontend puede mostrar
+"Detectamos 1 estimación dudosa" y el usuario decide si ajustar.
+
+- `src/lib/calibration.ts` — Tabla `FOOD_DENSITY` con ~40 categorías (kcal/g
+  min/max). Fuentes: BEDCA + USDA + ajustes del usuario. Categorías incluyen
+  cocina española (tortilla, jamón, paella) y **latinoamericana** (arepa,
+  empanada_frita, chicharrones, tostones, chorizo). `classifyFood(name)` hace
+  match por **palabra completa** (token set) con variantes singular/plural.
+  Decisión consciente: substring libre causaba falsos positivos
+  ("empanada" matcheaba accidentalmente con `pan_blanco`).
+- `src/lib/postprocess.ts` — `calibrateMeal` itera los items, genera flags
+  `density_outlier` cuando `kcal/g` cae fuera del rango con tolerancia
+  extendida (±30% inferior, +40% superior). También flag `sum_mismatch` si
+  la suma de items difiere del `kcal_total` en >10%.
+- Auto-degradación de confianza:
+  - ≥2 density_outlier → `"baja"`
+  - 1 outlier + original `"alta"` → `"media"`
+  - 1 outlier + original `"media"` → sin cambio (no cascadeamos)
+  - sum_mismatch adicional cuando final=`"media"` → baja a `"baja"`
+
+**Limitaciones**: la API de visión no es determinística (cada llamada al
+mismo foto devuelve items distintos), por lo que no podemos garantizar que
+un foto específico genere siempre ≥1 flag. La cobertura mejora con el tiempo
+añadiendo más categorías a la tabla según feedback del usuario.
 
 ## 5. Tests
 
 - **integration** (`tests/integration/meals.test.ts`): `:memory:` SQLite,
   CRUD completo, CHECK constraint, cascade delete, totales. Deterministas,
   no requieren red.
+- **integration** (`tests/integration/calibration.test.ts`): llama a
+  `POST /api/scan` con tres fotos reales (empanadas+huevos+chicharrones,
+  cinta métrica como no-comida, tortita+jamon). SKIP si no hay key/quota.
+  Verifica estructura `_calibration` siempre presente. No exige flag
+  concreto porque la API no es determinística.
+- **integration** (`tests/integration/date-validation.test.ts`): validación
+  estricta de fechas (calendario real + paridad GET/POST).
+- **unit** (`tests/unit/calibration.test.ts`): 15 tests deterministas sobre
+  `classifyFood` y `calibrateMeal`. Cubre: tabla `FOOD_DENSITY` completa,
+  match singular/plural, detección de outliers con datos sintéticos (empanadas
+  a 5 kcal/g, chicharrones a 12 kcal/g), degradación de confianza, escenarios
+  reales del round de testing del usuario.
 - **unit** (`tests/unit/scan.test.ts`): usa `img_def9cea61201.jpg` (jamón
   + tortilla pequeña, ~80-120 kcal). **SKIP explícito** si no hay
   `MINIMAX_API_KEY` o si upstream devuelve 429/quota. Esto es importante:
