@@ -1,6 +1,7 @@
 // app/api/meals/totals/route.ts — GET ?date=YYYY-MM-DD -> sums + daily_settings
 import { NextRequest, NextResponse } from "next/server";
 import { initDb } from "@/lib/db";
+import { DateString } from "@/lib/schemas";
 import { ApiError, errorResponse } from "@/lib/errors";
 
 export const runtime = "nodejs";
@@ -11,8 +12,12 @@ export async function GET(req: NextRequest) {
     const db = initDb();
     const url = new URL(req.url);
     const date = url.searchParams.get("date");
-    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    if (!date) {
       throw new ApiError(400, "invalid_date", "date query param required (YYYY-MM-DD)");
+    }
+    const parsed = DateString.safeParse(date);
+    if (!parsed.success) {
+      throw new ApiError(400, "invalid_date", "date must be YYYY-MM-DD and a valid calendar date");
     }
     const sum = db
       .prepare(

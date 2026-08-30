@@ -5,6 +5,27 @@ import { z } from "zod";
 export const MEAL_TYPES = ["breakfast", "lunch", "dinner", "snack"] as const;
 export const CONFIDENCE = ["alta", "media", "baja"] as const;
 
+/**
+ * Calendar date in YYYY-MM-DD. Validates both the SHAPE (regex) and the SEMANTICS
+ * (real day, real month, leap-year aware). Refuses strings like "2026-13-99"
+ * or "2025-02-30" that pass a naive regex but would corrupt SQL date filters.
+ */
+export const DateString = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "date must be YYYY-MM-DD")
+  .refine(
+    (s) => {
+      const [y, m, d] = s.split("-").map(Number);
+      const dt = new Date(Date.UTC(y, m - 1, d));
+      return (
+        dt.getUTCFullYear() === y &&
+        dt.getUTCMonth() === m - 1 &&
+        dt.getUTCDate() === d
+      );
+    },
+    { message: "date is not a valid calendar date" }
+  );
+
 export const FoodItemSchema = z.object({
   name: z.string().min(1).max(120),
   grams: z.number().nonnegative(),
@@ -33,7 +54,7 @@ export const ScanInputSchema = z.object({
 });
 
 export const MealInputSchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "date must be YYYY-MM-DD"),
+  date: DateString,
   meal: z.enum(MEAL_TYPES),
   items: z.array(FoodItemSchema).min(1),
   photo_base64: z.string().optional(),
@@ -43,7 +64,7 @@ export const MealInputSchema = z.object({
 
 export const MealPatchSchema = z
   .object({
-    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    date: DateString.optional(),
     meal: z.enum(MEAL_TYPES).optional(),
     items: z.array(FoodItemSchema).min(1).optional(),
     photo_base64: z.string().nullable().optional(),

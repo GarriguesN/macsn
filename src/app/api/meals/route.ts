@@ -1,9 +1,25 @@
 // app/api/meals/route.ts — GET (filters) + POST (create)
 import { NextRequest, NextResponse } from "next/server";
 import { initDb } from "@/lib/db";
-import { MealInputSchema, MEAL_TYPES } from "@/lib/schemas";
+import { DateString, MealInputSchema, MEAL_TYPES } from "@/lib/schemas";
 import { ApiError, errorResponse } from "@/lib/errors";
 import type { MealRow } from "@/types";
+
+function validateDateParam(
+  value: string | null,
+  field: "date" | "from" | "to"
+): string | null {
+  if (value === null) return null;
+  const r = DateString.safeParse(value);
+  if (!r.success) {
+    throw new ApiError(
+      400,
+      `invalid_${field}`,
+      `${field} must be YYYY-MM-DD and a valid calendar date`
+    );
+  }
+  return value;
+}
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,9 +61,9 @@ export async function GET(req: NextRequest) {
   try {
     const db = initDb();
     const url = new URL(req.url);
-    const date = url.searchParams.get("date");
-    const from = url.searchParams.get("from");
-    const to = url.searchParams.get("to");
+    const date = validateDateParam(url.searchParams.get("date"), "date");
+    const from = validateDateParam(url.searchParams.get("from"), "from");
+    const to = validateDateParam(url.searchParams.get("to"), "to");
     const meal = url.searchParams.get("meal");
 
     const where: string[] = [];

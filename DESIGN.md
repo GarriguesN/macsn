@@ -140,3 +140,14 @@ No se sube imagen a ningún registry: el CT destino construye localmente.
 - Sync entre dispositivos. Decisión consciente del producto.
 - Cola/workers para vision. La llamada es sync; si hay latencia alta se
   puede mover a streaming SSE más adelante.
+
+## 8. Limitaciones conocidas (deuda técnica)
+
+- **CORS**: el backend no define `Access-Control-Allow-Origin` en MVP.
+  Aceptable para LAN; en producción pública añadir middleware Next.js
+  con allowlist (probablemente solo `https://macsn.nglab.es`).
+- **Validación de fechas**: el esquema `DateString` (ver `src/lib/schemas.ts`)
+  valida forma YYYY-MM-DD **y** calendario real (rechaza `2026-13-99`,
+  `2025-02-30`, etc.). Aplica a POST/PATCH y a las query params
+  `?date`, `?from`, `?to` de GET. Antes de este fix, GET aceptaba
+  cualquier string y `POST` validaba solo la forma.
