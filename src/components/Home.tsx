@@ -13,7 +13,6 @@ import {
   Wheat,
 } from "lucide-react";
 import { api } from "@/lib/api-client";
-import { getCachedMeals, pendingScanCount, setCachedMeals } from "@/lib/db";
 import { addDaysISO, fmtNum, formatSpanishLong, todayISO } from "@/lib/date";
 import { fillRatio, pctText } from "@/lib/ring-math";
 import type { DailyTotalsRow, Meal } from "@/types";
@@ -62,6 +61,11 @@ export default function Home() {
   const [pending, setPending] = useState(0);
 
   const load = useCallback(async () => {
+    // Dexie solo corre en el cliente (IndexedDB): import dinámico para fuera del
+    // chunk eager del primer paint, se carga al primer fetch de datos.
+    const { getCachedMeals, pendingScanCount, setCachedMeals } = await import(
+      "@/lib/db"
+    );
     const date = todayISO();
     const from = addDaysISO(date, -6);
     setToday(date);

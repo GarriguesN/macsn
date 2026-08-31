@@ -15,10 +15,13 @@ truth para validación con Zod.
 cp .env.example .env
 # Edit .env and set MINIMAX_API_KEY=sk-cp-...
 
-npm install
+npm install --legacy-peer-deps   # React 19 RC + @types/react 18 chocan en peer deps
 npm run dev          # http://localhost:3008
 npm run build && npm start
 ```
+
+> Alternativa: `bash scripts/setup.sh` hace lo mismo de forma reproducible
+> (`npm ci --legacy-peer-deps` con fallback a `npm install --legacy-peer-deps`).
 
 ## Endpoints
 

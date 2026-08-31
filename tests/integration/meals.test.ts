@@ -1,7 +1,13 @@
 // tests/integration/meals.test.ts — SQLite :memory: CRUD
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { NextRequest } from "next/server";
 import { initDb, resetDbForTest } from "../../src/lib/server/db";
+import { POST } from "../../src/app/api/meals/route";
+
+// El route handler usa initDb() -> getDbPath() -> MACSN_DB_PATH. En tests,
+// siempre :memory: (nunca tocar ./data/macsn.db del dev).
+process.env.MACSN_DB_PATH = ":memory:";
 
 describe("meals CRUD (SQLite :memory:)", () => {
   beforeEach(() => {
@@ -157,5 +163,66 @@ describe("meals CRUD (SQLite :memory:)", () => {
       db.prepare(`INSERT INTO meals (date, meal, kcal, p, f, h, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
         .run("2026-08-30", "brunch", 100, 1, 1, 1, Date.now())
     ).toThrow(/CHECK/);
+  });
+});
+
+describe("POST /api/meals photo_base64 validation (route)", () => {
+  beforeEach(() => {
+    resetDbForTest();
+  });
+  afterEach(() => {
+    resetDbForTest();
+  });
+
+  function postMeal(body: unknown) {
+    return POST(
+      new NextRequest("http://localhost/api/meals", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      })
+    );
+  }
+
+  it("rejects photo_base64 con URL arbitraria -> 400 invalid_input", async () => {
+    const res = await postMeal({
+      date: "2026-08-30",
+      meal: "lunch",
+      items: [{ name: "pollo", grams: 200, kcal: 330, p: 62, f: 7, h: 0 }],
+      photo_base64: "http://evil.example/x.jpg",
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { code: string; details?: { fieldErrors: Record<string, string[]> } };
+    expect(body.code).toBe("invalid_input");
+    expect(body.details?.fieldErrors.photo_base64).toBeDefined();
+  });
+
+  it("acepta photo_base64 null -> 201", async () => {
+    const res = await postMeal({
+      date: "2026-08-30",
+      meal: "lunch",
+      items: [{ name: "pollo", grams: 200, kcal: 330, p: 62, f: 7, h: 0 }],
+      photo_base64: null,
+    });
+    expect(res.status).toBe(201);
+  });
+
+  it("acepta POST sin photo_base64 (campo opcional) -> 201", async () => {
+    const res = await postMeal({
+      date: "2026-08-30",
+      meal: "lunch",
+      items: [{ name: "pollo", grams: 200, kcal: 330, p: 62, f: 7, h: 0 }],
+    });
+    expect(res.status).toBe(201);
+  });
+
+  it("acepta un data URL de imagen válido -> 201", async () => {
+    const res = await postMeal({
+      date: "2026-08-30",
+      meal: "lunch",
+      items: [{ name: "pollo", grams: 200, kcal: 330, p: 62, f: 7, h: 0 }],
+      photo_base64: "data:image/jpeg;base64,/9j/4AAQ",
+    });
+    expect(res.status).toBe(201);
   });
 });

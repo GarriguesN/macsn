@@ -6,6 +6,13 @@ export const MEAL_TYPES = ["breakfast", "lunch", "dinner", "snack"] as const;
 export const CONFIDENCE = ["alta", "media", "baja"] as const;
 
 /**
+ * Data URL de imagen (jpeg/jpg/png/webp + base64). Único formato aceptado para
+ * `image` (scan) y `photo_base64` (meals): impide URLs arbitrarias
+ * (tracking pixels, exfiltración) lleguen al <img> del cliente.
+ */
+export const PHOTO_DATA_URL_REGEX = /^data:image\/(jpeg|jpg|png|webp);base64,/;
+
+/**
  * Calendar date in YYYY-MM-DD. Validates both the SHAPE (regex) and the SEMANTICS
  * (real day, real month, leap-year aware). Refuses strings like "2026-13-99"
  * or "2025-02-30" that pass a naive regex but would corrupt SQL date filters.
@@ -46,7 +53,7 @@ export const MealAnalysisSchema = z.object({
 });
 
 export const ScanInputSchema = z.object({
-  image: z.string().regex(/^data:image\/(jpeg|jpg|png|webp);base64,/, {
+  image: z.string().regex(PHOTO_DATA_URL_REGEX, {
     message: "image must be a data URL with base64 encoding (jpeg/jpg/png/webp)",
   }),
   meal: z.enum(MEAL_TYPES),
@@ -57,7 +64,14 @@ export const MealInputSchema = z.object({
   date: DateString,
   meal: z.enum(MEAL_TYPES),
   items: z.array(FoodItemSchema).min(1),
-  photo_base64: z.string().optional(),
+  photo_base64: z
+    .string()
+    .regex(PHOTO_DATA_URL_REGEX, {
+      message:
+        "photo_base64 must be a data URL with base64 encoding (jpeg/jpg/png/webp)",
+    })
+    .nullable()
+    .optional(),
   confidence: z.enum(CONFIDENCE).optional(),
   notes: z.string().max(500).optional(),
 });
@@ -67,7 +81,14 @@ export const MealPatchSchema = z
     date: DateString.optional(),
     meal: z.enum(MEAL_TYPES).optional(),
     items: z.array(FoodItemSchema).min(1).optional(),
-    photo_base64: z.string().nullable().optional(),
+    photo_base64: z
+      .string()
+      .regex(PHOTO_DATA_URL_REGEX, {
+        message:
+          "photo_base64 must be a data URL with base64 encoding (jpeg/jpg/png/webp)",
+      })
+      .nullable()
+      .optional(),
     confidence: z.enum(CONFIDENCE).nullable().optional(),
     notes: z.string().max(500).nullable().optional(),
   })

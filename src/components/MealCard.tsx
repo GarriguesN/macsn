@@ -3,6 +3,7 @@
 import {
   Apple,
   Coffee,
+  Image as ImageIcon,
   Utensils,
   UtensilsCrossed,
   type LucideIcon,
@@ -77,7 +78,7 @@ export default function MealCard({ meal, onLongPress }: MealCardProps) {
           {fmtNum(meal.f)}G
         </p>
       </div>
-      {meal.photo_base64 && (
+      {meal.photo_base64?.startsWith("data:image/") ? (
         // miniatura de la foto del plato (data URL del backend)
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -85,7 +86,13 @@ export default function MealCard({ meal, onLongPress }: MealCardProps) {
           alt=""
           className="h-12 w-12 shrink-0 rounded-lg object-cover"
         />
-      )}
+      ) : meal.photo_base64 ? (
+        // photo_base64 no es un data URL (back-end viejo / manual): nunca
+        // renderizar <img> con src arbitrario (pixel de tracking / exfil)
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-grouped-bg">
+          <ImageIcon className="h-5 w-5 text-label-tertiary" strokeWidth={1.8} />
+        </div>
+      ) : null}
     </div>
   );
 }
