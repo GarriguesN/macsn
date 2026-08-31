@@ -1,0 +1,18 @@
+{
+  "name": "Macsn",
+  "short_name": "Macsn",
+  "description": "Escanea tus comidas y controla calorías y macros.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FAFAF7",
+  "theme_color": "#34A853",
+  "lang": "es",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

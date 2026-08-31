@@ -187,6 +187,33 @@ Tipos `meal`: `breakfast | lunch | dinner | snack` (CHECK constraint).
 Confianza: `alta | media | baja`.
 Totales (`kcal, p, f, h`) son columnas **derivadas** — se recomputan en POST/PATCH.
 
+## Frontend PWA (Ticket #1)
+
+El Home real (`/`) convive con el backend en el mismo proceso Next.js: el
+cliente hace `fetch('/api/...')` a rutas relativas (mismo host en dev y prod).
+
+- **`/`** — Home: Large Title "Resumen" + fecha es-ES, **RingChart de 4 anillos**
+  concéntricos (kcal 18pt → P 16pt → H 14pt → G 12pt, colores Apple) con leyenda
+  lateral, sparklines de la última semana, lista de comidas del día (max 4 + "Ver
+  todas"), FAB cámara (abre modal placeholder del scan, ticket #2), borrar por
+  long-press (menú contextual), banner de scans pendientes y bottom nav 3 tabs.
+- **`/historial` y `/ajustes`** — placeholders "Próximamente" (tickets #4/#5).
+- **Design tokens**: Tailwind v3 (`tailwind.config.ts`) con la paleta iOS del
+  plan v2 §13, tipografía SF (`-apple-system`), `font-feature-settings: "tnum" 1`
+  para cifras tabulares, fondo `#FAFAF7`, shadow-fab y radios iOS (cards 20pt).
+- **`src/lib/db.ts`** — IndexedDB cache con **Dexie** (cliente): tablas
+  `meals_cache` (fecha → meals) y `pending_scans` (cola offline para el SW del
+  ticket #3). Helpers: `getCachedMeals`, `setCachedMeals`, `enqueueScan`,
+  `pendingScanCount`. El SQLite del backend está en `src/lib/server/db.ts`
+  (nunca importar desde componentes cliente).
+- **`src/lib/api-client.ts`** — cliente tipado: `getMeals`, `getMealRange`,
+  `getTotals`, `createMeal`, `updateMeal`, `deleteMeal`, `scanImage`
+  (lanzan `ApiClientError` con status).
+- **Manifest PWA** mínimo en `public/manifest.webmanifest` + `public/icon.svg`.
+  Service worker real: ticket #3.
+- **Regla de datos**: sin seeders ni datos de ejemplo — si la DB está vacía se
+  muestra el empty state real. Para probar, insertar vía `curl POST /api/meals`.
+
 ## Tests
 
 ```bash

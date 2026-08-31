@@ -1,6 +1,6 @@
 // app/api/meals/totals/route.ts — GET ?date=YYYY-MM-DD -> sums + daily_settings
 import { NextRequest, NextResponse } from "next/server";
-import { initDb } from "@/lib/db";
+import { initDb } from "@/lib/server/db";
 import { DateString } from "@/lib/schemas";
 import { ApiError, errorResponse } from "@/lib/errors";
 

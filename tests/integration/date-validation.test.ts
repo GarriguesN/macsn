@@ -13,7 +13,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 import { GET as mealsGET, POST as mealsPOST } from "../../src/app/api/meals/route";
 import { GET as totalsGET } from "../../src/app/api/meals/totals/route";
-import { resetDbForTest, initDb } from "../../src/lib/db";
+import { resetDbForTest, initDb } from "../../src/lib/server/db";
 import { DateString } from "../../src/lib/schemas";
 
 function makeReq(url: string, body?: unknown): NextRequest {

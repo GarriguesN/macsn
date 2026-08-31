@@ -8,6 +8,15 @@ BASE="${BASE:-http://localhost:3008}"
 echo "==> health"
 curl -fsS "${BASE}/api/health" | head -c 200; echo
 
+echo "==> home html (title + 4 rings)"
+HTML=$(curl -fsS "${BASE}/")
+echo "$HTML" | grep -q "Resumen" && echo "OK: contiene 'Resumen'"
+echo "$HTML" | grep -q "de agosto\|de septiembre\|de octubre\|de noviembre\|de diciembre\|de enero\|de febrero\|de marzo\|de abril\|de mayo\|de junio\|de julio" \
+  && echo "OK: fecha en español"
+CIRCLES=$(echo "$HTML" | grep -o "<circle" | wc -l)
+echo "circles en HTML: $CIRCLES (esperado >= 8: 4 pistas + 4 progresos)"
+[ "$CIRCLES" -ge 8 ] && echo "OK: anillos presentes"
+
 echo "==> meals list (should be [])"
 curl -fsS "${BASE}/api/meals" | head -c 200; echo
 

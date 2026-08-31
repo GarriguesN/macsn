@@ -1,6 +1,6 @@
 // app/api/meals/[id]/route.ts — GET / PATCH / DELETE
 import { NextRequest, NextResponse } from "next/server";
-import { initDb } from "@/lib/db";
+import { initDb } from "@/lib/server/db";
 import { MealPatchSchema, MEAL_TYPES } from "@/lib/schemas";
 import { ApiError, errorResponse } from "@/lib/errors";
 import type { MealRow } from "@/types";

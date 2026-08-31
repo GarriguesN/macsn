@@ -1,76 +1,86 @@
-// lib/db.ts — better-sqlite3 init (idempotent). Returns a singleton DB.
+// lib/db.ts — IndexedDB cache (Dexie). CLIENTE-ONLY.
+// El SQLite del backend vive en src/lib/server/db.ts — nunca importar aquí.
 
-import Database from "better-sqlite3";
-import path from "node:path";
-import fs from "node:fs";
+import Dexie, { type Table } from "dexie";
+import type { Meal, MealType } from "@/types";
 
-export type DB = Database.Database;
-
-let _db: DB | null = null;
-
-const SCHEMA = `
-CREATE TABLE IF NOT EXISTS meals (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  date TEXT NOT NULL,
-  meal TEXT NOT NULL CHECK (meal IN ('breakfast','lunch','dinner','snack')),
-  kcal INTEGER NOT NULL,
-  p INTEGER NOT NULL,
-  f INTEGER NOT NULL,
-  h INTEGER NOT NULL,
-  photo_base64 TEXT,
-  confidence TEXT,
-  notes TEXT,
-  created_at INTEGER NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_meals_date ON meals(date);
-CREATE INDEX IF NOT EXISTS idx_meals_meal ON meals(meal);
-
-CREATE TABLE IF NOT EXISTS food_items (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  meal_id INTEGER NOT NULL REFERENCES meals(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  grams REAL NOT NULL,
-  kcal INTEGER NOT NULL,
-  p REAL NOT NULL,
-  f REAL NOT NULL,
-  h REAL NOT NULL,
-  ord INTEGER NOT NULL DEFAULT 0
-);
-CREATE INDEX IF NOT EXISTS idx_food_items_meal ON food_items(meal_id);
-
-CREATE TABLE IF NOT EXISTS daily_settings (
-  date TEXT PRIMARY KEY,
-  kcal_goal INTEGER,
-  p_ratio INTEGER,
-  f_ratio INTEGER,
-  h_ratio INTEGER
-);
-`;
-
-export function getDbPath(): string {
-  const envPath = process.env.MACSN_DB_PATH;
-  if (envPath) return envPath;
-  const dataDir = path.join(process.cwd(), "data");
-  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-  return path.join(dataDir, "macsn.db");
+export interface CachedDay {
+  date: string;
+  meals: Meal[];
+  updatedAt: number;
 }
 
-export function initDb(dbPath?: string): DB {
-  if (_db) return _db;
-  const finalPath = dbPath ?? getDbPath();
-  const dir = path.dirname(finalPath);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  const db = new Database(finalPath);
-  db.pragma("journal_mode = WAL");
-  db.pragma("foreign_keys = ON");
-  db.exec(SCHEMA);
-  _db = db;
-  return db;
+export interface PendingScan {
+  id?: number;
+  image: string;
+  meal: MealType;
+  createdAt: number;
+  status: "pending" | "syncing" | "failed";
 }
 
+class MacsnDB extends Dexie {
+  meals_cache!: Table<CachedDay, string>;
+  pending_scans!: Table<PendingScan, number>;
+
+  constructor() {
+    super("macsn");
+    this.version(1).stores({
+      meals_cache: "date",
+      pending_scans: "++id, createdAt, status",
+    });
+  }
+}
+
+let _db: MacsnDB | null = null;
+
+/** Singleton a prueba de SSR: sin indexedDB (servidor) -> null, todo no-op. */
+function getDb(): MacsnDB | null {
+  if (typeof indexedDB === "undefined") return null;
+  if (!_db) _db = new MacsnDB();
+  return _db;
+}
+
+/** Reset para tests: cierra y descarta la instancia. */
 export function resetDbForTest(): void {
   if (_db) {
     _db.close();
     _db = null;
   }
+}
+
+/** Meals cacheados de una fecha, o null si no hay entrada. */
+export async function getCachedMeals(date: string): Promise<Meal[] | null> {
+  const db = getDb();
+  if (!db) return null;
+  const row = await db.meals_cache.get(date);
+  return row ? row.meals : null;
+}
+
+/** Escribe/sobrescribe el cache de una fecha. */
+export async function setCachedMeals(date: string, meals: Meal[]): Promise<void> {
+  const db = getDb();
+  if (!db) return;
+  await db.meals_cache.put({ date, meals, updatedAt: Date.now() });
+}
+
+/** Encola un scan pendiente de sincronizar (offline-first, ticket #3). */
+export async function enqueueScan(
+  image: string,
+  meal: MealType
+): Promise<number> {
+  const db = getDb();
+  if (!db) return -1;
+  return db.pending_scans.add({
+    image,
+    meal,
+    createdAt: Date.now(),
+    status: "pending",
+  });
+}
+
+/** Scans pendientes (pending + failed) para el banner del Home. */
+export async function pendingScanCount(): Promise<number> {
+  const db = getDb();
+  if (!db) return 0;
+  return db.pending_scans.where("status").anyOf("pending", "failed").count();
 }

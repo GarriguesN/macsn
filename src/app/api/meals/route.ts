@@ -1,6 +1,6 @@
 // app/api/meals/route.ts — GET (filters) + POST (create)
 import { NextRequest, NextResponse } from "next/server";
-import { initDb } from "@/lib/db";
+import { initDb } from "@/lib/server/db";
 import { DateString, MealInputSchema, MEAL_TYPES } from "@/lib/schemas";
 import { ApiError, errorResponse } from "@/lib/errors";
 import type { MealRow } from "@/types";

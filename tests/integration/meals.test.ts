@@ -1,7 +1,7 @@
 // tests/integration/meals.test.ts — SQLite :memory: CRUD
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { initDb, resetDbForTest } from "../../src/lib/db";
+import { initDb, resetDbForTest } from "../../src/lib/server/db";
 
 describe("meals CRUD (SQLite :memory:)", () => {
   beforeEach(() => {
