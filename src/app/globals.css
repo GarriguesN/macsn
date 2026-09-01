@@ -23,6 +23,132 @@
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
   }
+
+  /* Reset appearance para los sliders del mockup */
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    background: transparent;
+    margin: 0;
+  }
+  input[type="range"]:focus {
+    outline: none;
+  }
+}
+
+@layer components {
+  /* ============================================
+     SLIDERS DEL MOCKUP
+     Estilos de los <input type="range"> del HTML:
+     - altura/peso: thumb verde de 30px, track de 2px
+     - macros: track 4px + thumb blanco 12px circular
+     ============================================ */
+  .slider-mockup {
+    -webkit-appearance: none;
+    width: 100%;
+    background: transparent;
+    margin: 10px 0;
+  }
+  .slider-mockup:focus {
+    outline: none;
+  }
+  .slider-mockup::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 2px;
+    cursor: pointer;
+    background: #e0e0e0;
+    border-radius: 2px;
+  }
+  .slider-mockup::-webkit-slider-thumb {
+    height: 24px;
+    width: 24px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 3px solid #1e7b3d;
+    cursor: pointer;
+    -webkit-appearance: none;
+    margin-top: -11px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  }
+  .slider-mockup::-moz-range-track {
+    width: 100%;
+    height: 2px;
+    cursor: pointer;
+    background: #e0e0e0;
+    border-radius: 2px;
+  }
+  .slider-mockup::-moz-range-thumb {
+    height: 24px;
+    width: 24px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 3px solid #1e7b3d;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  }
+
+  /* Animaciones de entrada del mockup */
+  .anim-fade-up {
+    animation: fadeUp 0.6s ease-out both;
+  }
+  .anim-fade-up-delay-1 {
+    animation: fadeUp 0.6s ease-out 0.2s both;
+  }
+  .anim-fade-up-delay-2 {
+    animation: fadeUp 0.6s ease-out 0.4s both;
+  }
+  .anim-fade-right {
+    animation: fadeRight 0.35s ease-out both;
+  }
+  .anim-fade-right-fast {
+    animation: fadeRight 0.3s ease-out both;
+  }
+
+  /* Scroll-snap horizontal (carrusel frecuentes) */
+  .carousel-snap {
+    display: flex;
+    overflow-x: auto;
+    gap: 12px;
+    padding-bottom: 8px;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+  .carousel-snap::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Ocultar scrollbars en contenedores scroll-y del mockup */
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  /* Gradiente inferior del footer flotante de sub-vistas */
+  .footer-gradient {
+    background: linear-gradient(
+      to top,
+      #fafafa 80%,
+      rgba(250, 250, 250, 0)
+    );
+  }
+
+  /* Botón con feedback táctil del mockup */
+  .btn-mockup {
+    transition: transform 0.12s ease, opacity 0.12s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn-mockup:active:not(:disabled) {
+    transform: scale(0.97);
+    opacity: 0.85;
+  }
+  .btn-mockup:focus-visible {
+    outline: 3px solid #1e7b3d;
+    outline-offset: 2px;
+  }
 }
 
 @layer utilities {
@@ -31,6 +157,10 @@
   }
   .pt-safe {
     padding-top: env(safe-area-inset-top);
+  }
+  /* padding-top 50px = zona reservada para el notch/status bar */
+  .pt-notch {
+    padding-top: 50px;
   }
 }
 
@@ -42,5 +172,34 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* Keyframes del mockup */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeRight {
+  from {
+    opacity: 0;
+    transform: translateX(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
   }
 }

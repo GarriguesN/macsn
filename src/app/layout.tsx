@@ -1,6 +1,8 @@
 // app/layout.tsx — root layout mobile-first (PWA)
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { AppProvider } from "@/lib/store";
+import AppBootstrap from "@/components/AppBootstrap";
 
 export const metadata: Metadata = {
   title: "Macsn",
@@ -32,7 +34,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es">
-      <body className="bg-system-bg text-label antialiased">{children}</body>
+      <body className="bg-system-bg text-label antialiased">
+        <AppProvider>
+          <AppBootstrap>{children}</AppBootstrap>
+        </AppProvider>
+      </body>
     </html>
   );
 }

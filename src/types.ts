@@ -88,3 +88,53 @@ export interface ScanResult {
   hidratos_total_g: number;
   items: FoodItem[];
 }
+
+// =================================================================
+// === MOCKUP TYPES (vista de la migración de complete-desing.html) ==
+// =================================================================
+
+/** Objetivo principal del usuario en el onboarding */
+export type GoalKey =
+  | "lose_fast" // perder rápido
+  | "lose" // perder
+  | "maintain" // mantener
+  | "gain" // ganar
+  | "recomp"; // recomposición
+
+/** Sexo biológico */
+export type Sex = "male" | "female";
+
+/** Nivel de actividad física (5 niveles) */
+export type ActivityLevel =
+  | "sedentary"
+  | "light"
+  | "moderate"
+  | "active"
+  | "very_active";
+
+/** Escala del historial (filtro del Diario) */
+export type HistoryScale = "days" | "weeks" | "months" | "years";
+
+/** Rango de estadísticas (más simple que HistoryScale) */
+export type StatsRange = "week" | "month" | "year" | "all";
+
+/** Unidad de las barras de macros (Stats) */
+export type MacroUnit = "g" | "%";
+
+/** Métrica del gráfico de líneas (Stats) */
+export type StatsMetric = "kcal" | "p" | "h" | "f";
+
+/** Pestaña activa del BottomNav */
+export type BottomTab = "home" | "history" | "stats" | "settings";
+
+/** Modo del escáner */
+export type ScannerMode = "comida" | "codigo";
+
+/** Unidad de medida preferida */
+export type Units = "metric" | "imperial";
+
+/** Idioma de la UI */
+export type Language = "es" | "en" | "ca" | "fr";
+
+/** Tema visual */
+export type Theme = "system" | "light" | "dark";

@@ -21,6 +21,30 @@ const config: Config = {
         "macro-p": "#1F7A3A",
         "macro-f": "#F59E0B",
         "macro-h": "#0EA5E9",
+        // === Mockup "complete-desing.html" — colores exactos del HTML ===
+        // No rompen los tokens existentes, los extienden.
+        brand: {
+          DEFAULT: "#1e7b3d",       // mid green (iconos, texto, badges)
+          dark: "#0f5b2d",          // verde oscuro de CTAs primarios
+          accent: "#28a745",        // verde claro de a los chips / rings P
+          tint: "#f0f7f2",          // fondo verdoso claro
+        },
+        // Colores específicos del mockup (no colisionan con los tokens previos)
+        mockup: {
+          "cal-red": "#e81e3a",     // rojo kcal
+          "pro-green": "#28a745",   // verde proteínas
+          "car-blue": "#2d9cdb",    // azul hidratos
+          "fat-orange": "#f39c12",  // naranja grasas
+          "label": "#1a1a1a",       // texto principal
+          "label-2": "#757575",     // texto secundario
+          "label-3": "#a0a0a0",     // texto terciario
+          "border": "#f0f0f0",      // borde de tarjetas
+          "border-2": "#e0e0e0",    // borde de inputs / separadores
+          "bg-app": "#fafafa",      // fondo de pantallas (light)
+          "bg-tabs": "#f5f5f5",     // fondo de pantallas con tabs
+          "bg-info": "#f8f9fa",     // fondo de info banners
+          "slider-track": "#f0f0f0",
+        },
       },
       fontFamily: {
         sans: [
@@ -50,6 +74,7 @@ const config: Config = {
         md: "12pt",
         lg: "20pt",
         xl: "24pt",
+        "2xl": "32px",
       },
       boxShadow: {
         sm: "0 1px 3px rgba(0,0,0,0.04)",

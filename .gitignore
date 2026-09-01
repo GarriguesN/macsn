@@ -39,3 +39,13 @@ coverage/
 
 # tsc incremental build info
 /tsconfig.tsbuildinfo
+
+# Mockup del UI (input de la migración, no parte del proyecto)
+complete-desing.html
+image-slot.js
+support.js
+
+# Skills / docs externas
+.impeccable/
+PRODUCT.md
+SPRINTS.md

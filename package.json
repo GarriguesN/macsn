@@ -17,7 +17,7 @@
   "dependencies": {
     "@boundaryml/baml": "^0.200.0",
     "autoprefixer": "^10.5.4",
-    "better-sqlite3": "^11.5.0",
+    "better-sqlite3": "^13.0.3",
     "clsx": "^2.1.1",
     "dexie": "^4.4.5",
     "framer-motion": "^13.1.1",
