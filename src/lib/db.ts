@@ -1,83 +1,67 @@
 // lib/db.ts — IndexedDB (Dexie) para Macsn. CLIENTE-ONLY.
 // El SQLite del backend vive en src/lib/server/db.ts — nunca importar aquí.
 //
-// Tablas:
-// - meals_cache     : snapshot por día del servidor (offline fallback)
-// - pending_scans   : scans en cola sin sincronizar
-// - user_profile    : singleton ("singleton") — datos del onboarding
-// - daily_targets   : singleton ("singleton") — kcal + macros
-// - meals_persisted : comidas reales (++id, date, meal, createdAt) — fuente de verdad local
-// - app_metadata    : singleton ("meta") — flag de seed, versión, etc.
+// Modelo (a partir del fix 3ceb7c9):
+// - El backend es la fuente de verdad. Dexie es cache offline + cola de ops pendientes.
+// - meals_cache     : array de comidas cacheadas (todas, sin agrupar por día)
+// - user_profile    : singleton ("singleton") — perfil cacheado del backend
+// - daily_targets   : singleton ("singleton") — objetivos cacheados
+// - pending_ops     : cola de mutaciones sin sincronizar (offline → online)
+// - app_metadata    : singleton ("meta") — versión, flags
 
 import Dexie, { type Table } from "dexie";
-import type { Meal, MealType } from "@/types";
+import type { Meal, MealPatch, MealType, FoodItem } from "@/types";
 import type { DailyTargets, UserProfile } from "@/data/user";
 
-export interface CachedDay {
-  date: string;
-  meals: Meal[];
-  updatedAt: number;
-}
-
-export interface PendingScan {
+export interface StoredMeal extends Omit<Meal, "id"> {
   id?: number;
-  image: string;
+  date: string;
   meal: MealType;
-  createdAt: number;
-  status: "pending" | "syncing" | "failed";
+  created_at: number;
 }
 
-export interface StoredProfile {
+interface StoredProfile {
   id: "singleton";
   profile: UserProfile;
   updatedAt: number;
 }
 
-export interface StoredTargets {
+interface StoredTargets {
   id: "singleton";
   targets: DailyTargets;
   updatedAt: number;
 }
 
-export interface StoredMeal extends Omit<Meal, "id"> {
-  /** id puede ser undefined en memoria antes de persistir */
-  id?: number;
-  /** fecha local YYYY-MM-DD (denormalizado para queries/range) */
-  date: string;
-  /** meal type duplicado a primer nivel para indexar */
-  meal: MealType;
-  /** epoch ms (alias de Meal.created_at) */
-  created_at: number;
-}
+/** Operaciones en cola para sincronizar cuando vuelva la red */
+type PendingOpBase = { id?: number; createdAt: number };
+
+export type PendingOp =
+  | (PendingOpBase & { kind: "create_meal"; payload: { date: string; meal: MealType; items: FoodItem[]; photo_base64?: string | null; confidence?: "alta" | "media" | "baja" | null; notes?: string | null } })
+  | (PendingOpBase & { kind: "update_meal"; targetId: number; payload: MealPatch })
+  | (PendingOpBase & { kind: "delete_meal"; targetId: number })
+  | (PendingOpBase & { kind: "update_profile"; payload: UserProfile })
+  | (PendingOpBase & { kind: "update_targets"; payload: DailyTargets });
 
 export interface AppMetadata {
   id: "meta";
-  seeded: boolean;
   schemaVersion: number;
 }
 
 class MacsnDB extends Dexie {
-  meals_cache!: Table<CachedDay, string>;
-  pending_scans!: Table<PendingScan, number>;
+  meals_cache!: Table<StoredMeal, number>;
   user_profile!: Table<StoredProfile, "singleton">;
   daily_targets!: Table<StoredTargets, "singleton">;
-  meals_persisted!: Table<StoredMeal, number>;
+  pending_ops!: Table<PendingOp, number>;
   app_metadata!: Table<AppMetadata, "meta">;
 
   constructor() {
     super("macsn");
-    // v1: solo cache y pending scans (estado original del MVP)
-    this.version(1).stores({
-      meals_cache: "date",
-      pending_scans: "++id, createdAt, status",
-    });
-    // v2: añadimos persistencia local real (perfil, targets, meals, meta)
-    this.version(2).stores({
-      meals_cache: "date",
-      pending_scans: "++id, createdAt, status",
+    // v4: meals_cache es array (no agrupado por fecha), cola de ops sin createdAt indexado.
+    this.version(4).stores({
+      meals_cache: "++id, date, meal",
       user_profile: "id",
       daily_targets: "id",
-      meals_persisted: "++id, date, meal, createdAt",
+      pending_ops: "++id, kind",
       app_metadata: "id",
     });
   }
@@ -101,178 +85,151 @@ export function resetDbForTest(): void {
 }
 
 // ============================================================================
-// Cache de servidor (existente — sin cambios)
+// Meals — cache local del backend
 // ============================================================================
 
-export async function getCachedMeals(date: string): Promise<Meal[] | null> {
-  const db = getDb();
-  if (!db) return null;
-  const row = await db.meals_cache.get(date);
-  return row ? row.meals : null;
-}
-
-export async function setCachedMeals(date: string, meals: Meal[]): Promise<void> {
+/** Cachear todas las comidas (sobrescribe el cache anterior) */
+export async function setCachedMeals(meals: StoredMeal[]): Promise<void> {
   const db = getDb();
   if (!db) return;
-  await db.meals_cache.put({ date, meals, updatedAt: Date.now() });
+  await db.meals_cache.clear();
+  if (meals.length > 0) {
+    await db.meals_cache.bulkPut(meals);
+  }
 }
 
-export async function enqueueScan(
-  image: string,
-  meal: MealType
-): Promise<number> {
+/** Añadir/actualizar una comida en el cache */
+export async function upsertCachedMeal(meal: StoredMeal): Promise<void> {
   const db = getDb();
-  if (!db) return -1;
-  return db.pending_scans.add({
-    image,
-    meal,
-    createdAt: Date.now(),
-    status: "pending",
-  });
+  if (!db) return;
+  if (meal.id && meal.id > 0) {
+    await db.meals_cache.put(meal);
+  } else {
+    await db.meals_cache.add(meal);
+  }
 }
 
-export async function pendingScanCount(): Promise<number> {
+/** Borrar una comida del cache por id */
+export async function deleteCachedMeal(id: number): Promise<void> {
   const db = getDb();
-  if (!db) return 0;
-  return db.pending_scans.where("status").anyOf("pending", "failed").count();
+  if (!db) return;
+  await db.meals_cache.delete(id);
+}
+
+/** Obtener todas las comidas cacheadas (sin filtrar) */
+export async function getAllCachedMeals(): Promise<StoredMeal[]> {
+  const db = getDb();
+  if (!db) return [];
+  return db.meals_cache.toArray();
+}
+
+/** Comidas de una fecha concreta (útil para selectores) */
+export async function getCachedMealsByDate(date: string): Promise<StoredMeal[]> {
+  const db = getDb();
+  if (!db) return [];
+  const rows = await db.meals_cache.where("date").equals(date).toArray();
+  return rows.sort((a, b) => a.created_at - b.created_at);
 }
 
 // ============================================================================
-// Perfil de usuario (singleton)
+// Profile + Targets (cache local)
 // ============================================================================
 
-export async function getStoredProfile(): Promise<UserProfile | null> {
+export async function getCachedProfile(): Promise<UserProfile | null> {
   const db = getDb();
   if (!db) return null;
   const row = await db.user_profile.get("singleton");
   return row ? row.profile : null;
 }
 
-export async function setStoredProfile(profile: UserProfile): Promise<void> {
+export async function setCachedProfile(profile: UserProfile): Promise<void> {
   const db = getDb();
   if (!db) return;
-  await db.user_profile.put({
-    id: "singleton",
-    profile,
-    updatedAt: Date.now(),
-  });
+  await db.user_profile.put({ id: "singleton", profile, updatedAt: Date.now() });
 }
 
-// ============================================================================
-// Objetivos diarios (singleton)
-// ============================================================================
-
-export async function getStoredTargets(): Promise<DailyTargets | null> {
+export async function getCachedTargets(): Promise<DailyTargets | null> {
   const db = getDb();
   if (!db) return null;
   const row = await db.daily_targets.get("singleton");
   return row ? row.targets : null;
 }
 
-export async function setStoredTargets(targets: DailyTargets): Promise<void> {
+export async function setCachedTargets(targets: DailyTargets): Promise<void> {
   const db = getDb();
   if (!db) return;
-  await db.daily_targets.put({
-    id: "singleton",
-    targets,
-    updatedAt: Date.now(),
-  });
+  await db.daily_targets.put({ id: "singleton", targets, updatedAt: Date.now() });
 }
 
 // ============================================================================
-// Comidas persistidas (fuente de verdad local)
+// Cola de operaciones pendientes (escrituras offline)
 // ============================================================================
 
-/** Insertar una comida nueva. Devuelve el id asignado. */
-export async function insertMeal(meal: StoredMeal): Promise<number> {
-  const db = getDb();
-  if (!db) return -1;
-  return db.meals_persisted.add(meal);
-}
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
-export async function getMeal(id: number): Promise<StoredMeal | null> {
-  const db = getDb();
-  if (!db) return null;
-  const row = await db.meals_persisted.get(id);
-  return row ?? null;
-}
-
-/** Todas las comidas de un día (ordenadas por createdAt asc). */
-export async function getMealsByDate(date: string): Promise<StoredMeal[]> {
-  const db = getDb();
-  if (!db) return [];
-  const rows = await db.meals_persisted
-    .where("date")
-    .equals(date)
-    .toArray();
-  return rows.sort((a, b) => a.created_at - b.created_at);
-}
-
-/** Todas las comidas en un rango [from, to] inclusivo. */
-export async function getMealsByRange(
-  from: string,
-  to: string
-): Promise<StoredMeal[]> {
-  const db = getDb();
-  if (!db) return [];
-  const rows = await db.meals_persisted
-    .where("date")
-    .between(from, to, true, true)
-    .toArray();
-  return rows.sort((a, b) => a.created_at - b.created_at);
-}
-
-/** Todas las comidas (para cálculo de stats). ¡Cuidado: carga todo! */
-export async function getAllMeals(): Promise<StoredMeal[]> {
-  const db = getDb();
-  if (!db) return [];
-  return db.meals_persisted.orderBy("created_at").toArray();
-}
-
-export async function updateStoredMeal(
-  id: number,
-  patch: Partial<StoredMeal>
-): Promise<void> {
+/** Encolar una operación para sincronizar al volver online */
+export async function queueOp(op: DistributiveOmit<PendingOp, "createdAt" | "id">): Promise<void> {
   const db = getDb();
   if (!db) return;
-  await db.meals_persisted.update(id, patch);
+  await db.pending_ops.add({ ...op, createdAt: Date.now() } as PendingOp);
 }
 
-export async function deleteStoredMeal(id: number): Promise<void> {
+/** Número de operaciones pendientes de sincronizar */
+export async function getPendingOpCount(): Promise<number> {
+  const db = getDb();
+  if (!db) return 0;
+  return db.pending_ops.count();
+}
+
+/**
+ * Drenar la cola: ejecuta cada op contra los handlers del backend en orden.
+ * Si una op falla, se aborta el drain (la op problemática queda al final).
+ */
+export async function drainQueue(handlers: {
+  create: (input: Extract<PendingOp, { kind: "create_meal" }>["payload"]) => Promise<unknown>;
+  update: (id: number, patch: MealPatch) => Promise<unknown>;
+  delete: (id: number) => Promise<unknown>;
+  updateProfile: (profile: UserProfile) => Promise<unknown>;
+  updateTargets: (targets: DailyTargets) => Promise<unknown>;
+}): Promise<void> {
   const db = getDb();
   if (!db) return;
-  await db.meals_persisted.delete(id);
+  while (true) {
+    const next = await db.pending_ops.toCollection().first();
+    if (!next || next.id === undefined) return;
+    try {
+      if (next.kind === "create_meal") {
+        await handlers.create(next.payload);
+      } else if (next.kind === "update_meal") {
+        await handlers.update(next.targetId, next.payload);
+      } else if (next.kind === "delete_meal") {
+        await handlers.delete(next.targetId);
+      } else if (next.kind === "update_profile") {
+        await handlers.updateProfile(next.payload);
+      } else if (next.kind === "update_targets") {
+        await handlers.updateTargets(next.payload);
+      }
+      await db.pending_ops.delete(next.id);
+    } catch {
+      // El backend sigue caído o falló esta op. Paramos aquí;
+      // al volver online se reintentará.
+      return;
+    }
+  }
 }
 
 // ============================================================================
-// Metadata (seed flag, etc.)
-// ============================================================================
-
-export async function getMetadata(): Promise<AppMetadata | null> {
-  const db = getDb();
-  if (!db) return null;
-  return (await db.app_metadata.get("meta")) ?? null;
-}
-
-export async function setMetadata(meta: AppMetadata): Promise<void> {
-  const db = getDb();
-  if (!db) return;
-  await db.app_metadata.put(meta);
-}
-
-// ============================================================================
-// Reset total (para "Restablecer onboarding")
+// Reset total
 // ============================================================================
 
 export async function wipeAll(): Promise<void> {
   const db = getDb();
   if (!db) return;
   await Promise.all([
+    db.meals_cache.clear(),
     db.user_profile.clear(),
     db.daily_targets.clear(),
-    db.meals_persisted.clear(),
+    db.pending_ops.clear(),
     db.app_metadata.clear(),
-    db.meals_cache.clear(),
-    db.pending_scans.clear(),
   ]);
 }

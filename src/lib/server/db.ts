@@ -45,6 +45,38 @@ CREATE TABLE IF NOT EXISTS daily_settings (
   f_ratio INTEGER,
   h_ratio INTEGER
 );
+
+-- Singleton "profile" (id = 'singleton'): datos del usuario del onboarding.
+-- Sin login: en MVP 1 usuario 1 dispositivo.
+CREATE TABLE IF NOT EXISTS profile (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  goal TEXT NOT NULL,
+  sex TEXT NOT NULL,
+  birthday TEXT NOT NULL,
+  height INTEGER NOT NULL,
+  weight INTEGER NOT NULL,
+  activity TEXT NOT NULL,
+  language TEXT NOT NULL DEFAULT 'es',
+  theme TEXT NOT NULL DEFAULT 'system',
+  units TEXT NOT NULL DEFAULT 'metric',
+  reminders INTEGER NOT NULL DEFAULT 1,
+  updated_at INTEGER NOT NULL
+);
+
+-- Singleton "targets" (id = 'singleton'): kcal y macros objetivo.
+CREATE TABLE IF NOT EXISTS targets (
+  id TEXT PRIMARY KEY,
+  kcal INTEGER NOT NULL,
+  pro INTEGER NOT NULL,
+  car INTEGER NOT NULL,
+  fat INTEGER NOT NULL,
+  macro_pro INTEGER NOT NULL,
+  macro_car INTEGER NOT NULL,
+  macro_fat INTEGER NOT NULL,
+  meals_per_day INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
 `;
 
 export function getDbPath(): string {

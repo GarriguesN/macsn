@@ -7,6 +7,7 @@ import ScannerControls from "@/components/scanner/ScannerControls";
 import ScannerHelp from "@/components/scanner/ScannerHelp";
 import type { MealType, ScanResult } from "@/types";
 import { mockScan } from "@/lib/scan-mock";
+import { api } from "@/lib/api-client";
 import type { ScannerMode } from "@/types";
 
 interface ScannerProps {
@@ -33,8 +34,9 @@ export default function Scanner({
     if (takingPhoto) return;
     setTakingPhoto(true);
     try {
-      // Mock de visión: 1.2-1.8s, devuelve ScanResult plausible
-      const scan = await mockScan("", "lunch");
+      // Llama a /api/scan real. Si no hay foto (placeholder ""), backend
+      // devolverá 400 — el caller decidirá cómo manejarlo.
+      const scan = await api.scanImage("", defaultMealType);
       onCaptured?.(scan, defaultMealType);
     } catch {
       // abortado o error: cerramos el spinner y seguimos

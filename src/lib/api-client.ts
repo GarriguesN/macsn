@@ -82,4 +82,22 @@ export const api = {
         ...(mealContext ? { meal_context: mealContext } : {}),
       }),
     }),
+
+  /** GET /api/profile — devuelve el perfil persistido o DEFAULT_PROFILE */
+  getProfile: (): Promise<UserProfile> => request("/api/profile"),
+
+  /** PUT /api/profile */
+  updateProfile: (profile: UserProfile): Promise<UserProfile> =>
+    request("/api/profile", { method: "PUT", body: JSON.stringify(profile) }),
+
+  /** GET /api/targets */
+  getTargets: (): Promise<DailyTargets> => request("/api/targets"),
+
+  /** PUT /api/targets */
+  updateTargets: (targets: DailyTargets): Promise<DailyTargets> =>
+    request("/api/targets", { method: "PUT", body: JSON.stringify(targets) }),
 };
+
+// Tipos que viven en data/user y se exponen vía API
+import type { UserProfile, DailyTargets } from "@/data/user";
+export type { UserProfile, DailyTargets };
