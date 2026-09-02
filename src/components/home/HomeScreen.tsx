@@ -2,7 +2,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import HomeHeader from "@/components/home/HomeHeader";
 import MealRow from "@/components/home/MealRow";
 import MacroRingChart, { type RingDatum } from "@/components/charts/MacroRingChart";
@@ -15,6 +15,7 @@ import {
   useApp,
   selectMealsByDate,
   selectTotalsByDate,
+  isOnboardingComplete,
   type StoredMeal,
 } from "@/lib/store";
 import { todayISO } from "@/lib/date";
@@ -34,7 +35,17 @@ function pct(value: number, goal: number) {
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { profile, targets, meals } = useApp();
+  const { profile, targets, meals, hydrated } = useApp();
+
+  // Gate de onboarding: si no ha pasado, redirigir al wizard.
+  // El store ya devuelve defaults si el backend nunca se ha contactado,
+  // así que cuando el usuario aún no ha hecho onboarding su profile es el DEFAULT_PROFILE.
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!isOnboardingComplete(profile)) {
+      router.replace("/onboarding");
+    }
+  }, [hydrated, profile, router]);
 
   const [scannerOpen, setScannerOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -56,7 +67,12 @@ export default function HomeScreen() {
     [meals, today]
   );
 
-  const greeting = `Hola, ${profile.name} 👋`;
+  // Mientras redirige o está hidratando, no pintamos la Home
+  if (!hydrated || !isOnboardingComplete(profile)) {
+    return null;
+  }
+
+  const greeting = `Hola, ${profile.name}`;
   const subtitle =
     todayMeals.length === 0
       ? "Aún no has registrado comidas"
